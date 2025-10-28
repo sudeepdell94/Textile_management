@@ -70,7 +70,7 @@ export default function Dashboard() {
 
   return (
     <div className="container-fluid py-4 dashboard-container">
-      <h1 className="mb-4">Dashboard</h1>
+      <h1 className="mb-4">Dashboard_sudeep</h1>
 
       {/* Summary Cards */}
       <div className="row mb-4 g-3">
