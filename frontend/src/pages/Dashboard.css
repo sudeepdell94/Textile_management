@@ -1,0 +1,23 @@
+.dashboard-container {
+  font-family: "Segoe UI", sans-serif;
+}
+
+.stat-card h6 {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.card-body {
+  padding: 1rem;
+}
+
+.section-title {
+  font-weight: 600;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.table-responsive {
+  max-height: 400px;
+  overflow-y: auto;
+}
