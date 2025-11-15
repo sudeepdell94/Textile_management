@@ -1,4 +1,4 @@
-# Step 1: Build the React app
+# Step 1: Build Vite React app
 FROM node:22-alpine AS build
 
 WORKDIR /app
@@ -8,8 +8,10 @@ COPY . .
 RUN npm run build
 
 # Step 2: Serve with Nginx
-FROM nginx:stable-alpine
+FROM nginx:alpine
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
-EXPOSE 5173
-CMD ["npm","run","dev"]
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
