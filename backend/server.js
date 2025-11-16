@@ -16,9 +16,9 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.log("MongoDB Connection Error:", err));
 
 // mount routers
-app.use("/api/workers", workerRouter);                // /api/workers -> workers CRUD
-app.use("/api/workers/records", workerRecordRouter);  // /api/workers/records -> records endpoints
-app.use("/api/production", machineRouter);
+app.use("/workers", workerRouter);                // /api/workers -> workers CRUD
+app.use("/workers/records", workerRecordRouter);  // /api/workers/records -> records endpoints
+app.use("/production", machineRouter);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
