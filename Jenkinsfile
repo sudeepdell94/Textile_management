@@ -7,23 +7,21 @@ pipeline {
 
   stages {
 
-    stage('Checkout Code') {
+    stage('Checkout') {
       steps {
         checkout scm
       }
     }
 
-    stage('SonarQube Analysis - Backend') {
+    stage('SonarQube Analysis') {
       steps {
         withSonarQubeEnv('SonarQube') {
-          dir('backend') {
-            sh """
-              ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
-              -Dsonar.projectKey=textile-project \
-              -Dsonar.sources=. \
-              -Dsonar.host.url=http://sonarqube:9000
-            """
-          }
+          sh """
+            ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
+            -Dsonar.projectKey=textile-project \
+            -Dsonar.sources=. \
+            -Dsonar.host.url=http://44.200.177.153:9000
+          """
         }
       }
     }
@@ -36,20 +34,23 @@ pipeline {
       }
     }
 
-    stage('Build Docker Images') {
+    stage('Build & Deploy') {
       steps {
-        sh 'docker compose build'
+        sh '''
+          docker compose down
+          docker compose up -d --build
+        '''
       }
     }
 
   }
 
   post {
-    failure {
-      echo "❌ Pipeline failed due to quality gate or build error"
-    }
     success {
-      echo "✅ Code quality passed, build successful"
+      echo "✅ Quality Gate passed. Deployment successful."
+    }
+    failure {
+      echo "❌ Pipeline failed due to Quality Gate or build error."
     }
   }
 }
