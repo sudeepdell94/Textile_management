@@ -20,7 +20,7 @@ pipeline {
             ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
             -Dsonar.projectKey=textile-project \
             -Dsonar.sources=. \
-            -Dsonar.host.url=http://44.200.177.153:9000
+            -Dsonar.host.url=http://localhost/:9000
           """
         }
       }
