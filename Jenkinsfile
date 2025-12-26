@@ -19,8 +19,7 @@ pipeline {
           sh """
             ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
             -Dsonar.projectKey=textile-project \
-            -Dsonar.sources=. \
-            -Dsonar.host.url=http://localhost:9000
+            -Dsonar.sources=.
           """
         }
       }
