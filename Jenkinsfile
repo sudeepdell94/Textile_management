@@ -14,8 +14,6 @@ pipeline {
 
     stage('SonarQube Analysis') {
       steps {
-        // Use the tool name you defined in Step 4
-        def scannerHome = tool 'sonar-scanner'
 
         // Use the server name you defined in Step 3
         withSonarQubeEnv('SonarQube') {
