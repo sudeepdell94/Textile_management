@@ -15,7 +15,10 @@ pipeline {
 
         stage('SonarQube Analysis') {
       steps {
-        // 'SonarQube' must match the name in Manage Jenkins > System
+        // Use the tool name you defined in Step 4
+        def scannerHome = tool 'sonar-scanner'
+
+        // Use the server name you defined in Step 3
         withSonarQubeEnv('SonarQube') {
           sh "${SCANNER_HOME}/bin/sonar-scanner \
                         -Dsonar.projectKey=my-mern-app \
