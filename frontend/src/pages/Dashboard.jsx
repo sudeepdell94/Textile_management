@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+} from "recharts";
 import api from "../api.js"; // Import your axios instance
 import "./Dashboard.css";
 
@@ -12,28 +20,33 @@ export default function Dashboard() {
 
   const formatDate = (d) => d.toISOString().split("T")[0];
 
-  // Fetch worker records for the selected day
   const fetchWorkerRecords = async () => {
     try {
       const d = formatDate(date);
-      const res = await api.get(`/workers/records?date=${d}`); // Fixed URL
-      const data = res.data;
-      // remove duplicates
+      const res = await api.get(`/workers/records?date=${d}`);
+
+      const data = Array.isArray(res.data) ? res.data : [];
+
       const unique = Array.from(
-        new Map(data.map(r => [r.workerName + "_" + formatDate(new Date(r.date)), r])).values()
+        new Map(
+          data.map((r) => [
+            r.workerName + "_" + formatDate(new Date(r.date)),
+            r,
+          ]),
+        ).values(),
       );
+
       setWorkersRecords(unique);
     } catch (err) {
       console.error("Error fetching worker records:", err);
     }
   };
-
   // Fetch production per machine for today
   const fetchProductionToday = async () => {
     try {
       const d = formatDate(date);
       const res = await api.get(`/production/machine?date=${d}`); // Fixed URL
-      const data = res.data;
+      const data = res.data.records || [];
       setProductionToday(data);
     } catch (err) {
       console.error("Error fetching production today:", err);
@@ -44,11 +57,17 @@ export default function Dashboard() {
   const fetchWeeklyProduction = async () => {
     try {
       const start = formatDate(weekStart);
-      const res = await api.get(`/production/weekly?startDate=${start}`); // Fixed URL
-      const data = res.data;
+
+      const res = await api.get(`/production/weekly?startDate=${start}`);
+
+      console.log(res.data);
+
+      const data = Array.isArray(res.data) ? res.data : res.data.data || [];
+
       setWeeklyProduction(data);
     } catch (err) {
       console.error("Error fetching weekly production:", err);
+      setWeeklyProduction([]);
     }
   };
 
@@ -61,13 +80,23 @@ export default function Dashboard() {
   // Navigation functions
   const prevDay = () => setDate(new Date(date.setDate(date.getDate() - 1)));
   const nextDay = () => setDate(new Date(date.setDate(date.getDate() + 1)));
-  const prevWeek = () => setWeekStart(new Date(weekStart.setDate(weekStart.getDate() - 7)));
-  const nextWeek = () => setWeekStart(new Date(weekStart.setDate(weekStart.getDate() + 7)));
+  const prevWeek = () =>
+    setWeekStart(new Date(weekStart.setDate(weekStart.getDate() - 7)));
+  const nextWeek = () =>
+    setWeekStart(new Date(weekStart.setDate(weekStart.getDate() + 7)));
 
   // Summary metrics
-  const totalToday = productionToday.reduce((sum, p) => sum + (p.sareesProduced || 0), 0);
-  const totalWeek = weeklyProduction.reduce((sum, w) => sum + (w.sareesProduced || 0), 0);
-  const workersPresent = workersRecords.filter(r => r.status === "Present").length;
+  const totalToday = productionToday.reduce(
+    (sum, p) => sum + (p.sareesProduced || 0),
+    0,
+  );
+  const totalWeek = weeklyProduction.reduce(
+    (sum, w) => sum + (w.sareesProduced || 0),
+    0,
+  );
+  const workersPresent = workersRecords.filter(
+    (r) => r.status === "Present",
+  ).length;
 
   return (
     <div className="container-fluid py-4 dashboard-container">
@@ -108,9 +137,19 @@ export default function Dashboard() {
             <div className="card-body">
               <h5 className="mb-3">Production Per Machine (Today)</h5>
               <div className="d-flex justify-content-between align-items-center mb-2">
-                <button className="btn btn-sm btn-outline-secondary" onClick={prevDay}>{"<"}</button>
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={prevDay}
+                >
+                  {"<"}
+                </button>
                 <span>{date.toDateString()}</span>
-                <button className="btn btn-sm btn-outline-secondary" onClick={nextDay}>{">"}</button>
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={nextDay}
+                >
+                  {">"}
+                </button>
               </div>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={productionToday}>
@@ -118,7 +157,11 @@ export default function Dashboard() {
                   <XAxis dataKey="_id" />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="sareesProduced" fill="#0d6efd" radius={[4, 4, 0, 0]} />
+                  <Bar
+                    dataKey="sareesProduced"
+                    fill="#0d6efd"
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -130,17 +173,34 @@ export default function Dashboard() {
             <div className="card-body">
               <h5 className="mb-3">Weekly Production</h5>
               <div className="d-flex justify-content-between align-items-center mb-2">
-                <button className="btn btn-sm btn-outline-secondary" onClick={prevWeek}>{"<"}</button>
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={prevWeek}
+                >
+                  {"<"}
+                </button>
                 <span>Week of {weekStart.toDateString()}</span>
-                <button className="btn btn-sm btn-outline-secondary" onClick={nextWeek}>{">"}</button>
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={nextWeek}
+                >
+                  {">"}
+                </button>
               </div>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={weeklyProduction}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="_id.date" tickFormatter={d => new Date(d).toLocaleDateString()} />
+                  <XAxis
+                    dataKey="_id.date"
+                    tickFormatter={(d) => new Date(d).toLocaleDateString()}
+                  />
                   <YAxis />
-                  <Tooltip labelFormatter={d => new Date(d).toDateString()} />
-                  <Bar dataKey="sareesProduced" fill="#198754" radius={[4, 4, 0, 0]} />
+                  <Tooltip labelFormatter={(d) => new Date(d).toDateString()} />
+                  <Bar
+                    dataKey="sareesProduced"
+                    fill="#198754"
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -167,7 +227,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {workersRecords.map(r => (
+                    {workersRecords.map((r) => (
                       <tr key={r._id}>
                         <td>{r.workerName}</td>
                         <td>₹{r.salaryBefore}</td>

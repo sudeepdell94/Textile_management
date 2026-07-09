@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment 
+
+metadata:
+  name: backend
+  namespace: textile-app
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: backend
+  
+  template:
+    metadata:
+      labels:
+        app: backend
+
+    spec:
+      containers:
+        - name: backend
+          image:  sudeep102000/textile-backend:v3
+
+          volumeMounts:
+            - name: textile-storage
+              mountPath: /app/uploads
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secret
+      volumes:
+        - name:  textile-storage
+          persistentVolumeClaim:
+            claimName: textile-pvc
