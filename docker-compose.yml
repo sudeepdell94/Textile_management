@@ -12,17 +12,17 @@ services:
     build: ./frontend
     container_name: textile-frontend
     expose:
-      - "80"            # frontend listens on 80 *inside* Docker
+      - "8081"            # frontend listens on 80 *inside* Docker
     restart: always
 
-  nginx:
-    image: nginx:alpine
-    container_name: textile-nginx
-    ports:
-      - "80:80"         # only nginx exposed to outside
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - frontend
-      - backend
-    restart: always
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: textile-nginx
+  #   ports:
+  #     - "80:80"         # only nginx exposed to outside
+  #   volumes:
+  #     - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+  #   depends_on:
+  #     - frontend
+  #     - backend
+  #   restart: always

@@ -1,0 +1,13 @@
+namespace: textile-app
+
+backend:
+  image: sudeep102000/textile-backend:v4
+  replicas: 2
+  port: 5000
+
+frontend:
+  image: sudeep102000/textile-frontend:v4
+  replicas: 2
+  port: 80
+
+host: textile.com

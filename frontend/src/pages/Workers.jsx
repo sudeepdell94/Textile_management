@@ -35,7 +35,7 @@ export default function Workers() {
   const fetchMasterWorkers = async () => {
     try {
       const res = await api.get("/workers");
-      setMasterWorkers(res.data || []);
+      setMasterWorkers(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("fetchMasterWorkers:", err);
     }
@@ -51,7 +51,7 @@ export default function Workers() {
       if (params.endDate) q.set("endDate", params.endDate);
 
       const res = await api.get(`/workers/records?${q.toString()}`);
-      setRecords(res.data || []);
+      setRecords(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("fetchRecords:", err);
     }
