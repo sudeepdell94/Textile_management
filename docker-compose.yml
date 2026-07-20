@@ -3,7 +3,7 @@ services:
     image: 177203142319.dkr.ecr.ap-south-1.amazonaws.com/textile-backend:latest
     container_name: textile-backend
     expose:
-      - "5000"          # only inside Docker network
+      - "5000"
     env_file:
       - .env
     restart: always
@@ -11,15 +11,15 @@ services:
   frontend:
     image: 177203142319.dkr.ecr.ap-south-1.amazonaws.com/textile-frontend:latest
     container_name: textile-frontend
-    expose:
-      - "80"            # frontend listens on 80 *inside* Docker
+    expose:          # ✅ expose, NOT ports
+      - "80"
     restart: always
 
   nginx:
     image: nginx:alpine
     container_name: textile-nginx
     ports:
-      - "80:80"         # only nginx exposed to outside
+      - "80:80"      # ✅ Only nginx publishes to the outside
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
