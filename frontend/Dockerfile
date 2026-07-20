@@ -8,8 +8,11 @@ WORKDIR /app
 # Copy dependency files first
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+# Clean npm cache and remove lock file to trigger fresh install
+RUN rm -rf node_modules package-lock.json && npm cache clean --force
+
+# Install dependencies fresh
+RUN npm install
 
 # Copy source code
 COPY . .
