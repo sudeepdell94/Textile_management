@@ -5,14 +5,14 @@ services:
     expose:
       - "5000"          # only inside Docker network
     env_file:
-      - ./backend/.env
+      - .env
     restart: always
 
   frontend:
     image: 177203142319.dkr.ecr.ap-south-1.amazonaws.com/textile-frontend:latest
     container_name: textile-frontend
     expose:
-      - "8081"            # frontend listens on 80 *inside* Docker
+      - "80"            # frontend listens on 80 *inside* Docker
     restart: always
 
   # nginx:
