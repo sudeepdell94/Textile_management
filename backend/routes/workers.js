@@ -1,62 +1,86 @@
-// backend/routes/workers.js
 import express from "express";
-import Worker from "../models/Worker.js";
-import WorkerRecord from "../models/WorkerRecord.js";
+import prisma from "../config/prisma.js";
 
 const router = express.Router();
 
-// GET all workers (sorted)
+// GET all workers
 router.get("/", async (req, res) => {
   try {
-    const workers = await Worker.find().sort({ name: 1 }).lean();
+    const workers = await prisma.worker.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" }
+    });
+
     res.json(workers);
   } catch (err) {
-    console.error("GET /api/workers error:", err);
-    res.status(500).json({ error: "Server error" });
+    console.error(err);
+    res.status(500).json({ error: "Server Error" });
   }
 });
 
-// POST create worker
+// CREATE worker
 router.post("/", async (req, res) => {
   try {
     const { name, dob, dailySalary } = req.body;
-    if (!name) return res.status(400).json({ error: "Name is required" });
-    const w = new Worker({
-      name: name.trim(),
-      dob: dob ? new Date(dob) : null,
-      dailySalary: Number(dailySalary || 0)
+
+    const worker = await prisma.worker.create({
+      data: {
+        name: name.trim(),
+        dob: dob ? new Date(dob) : null,
+        dailySalary: Number(dailySalary || 0)
+      }
     });
-    await w.save();
-    res.status(201).json(w);
+
+    res.status(201).json(worker);
   } catch (err) {
-    console.error("POST /api/workers error:", err);
-    res.status(500).json({ error: "Server error" });
+    console.error(err);
+    res.status(500).json({ error: "Server Error" });
   }
 });
 
-// PUT update worker
+// UPDATE worker
 router.put("/:id", async (req, res) => {
   try {
-    const updates = { ...req.body };
-    if (updates.dob) updates.dob = new Date(updates.dob);
-    if (updates.dailySalary !== undefined) updates.dailySalary = Number(updates.dailySalary);
-    const updated = await Worker.findByIdAndUpdate(req.params.id, updates, { new: true });
+    const updated = await prisma.worker.update({
+      where: {
+        id: Number(req.params.id)
+      },
+      data: {
+        ...req.body,
+        dailySalary:
+          req.body.dailySalary !== undefined
+            ? Number(req.body.dailySalary)
+            : undefined,
+        dob: req.body.dob ? new Date(req.body.dob) : undefined
+      }
+    });
+
     res.json(updated);
   } catch (err) {
-    console.error("PUT /api/workers/:id error:", err);
-    res.status(500).json({ error: "Server error" });
+    console.error(err);
+    res.status(500).json({ error: "Server Error" });
   }
 });
 
-// DELETE worker (also delete associated records)
+// SOFT DELETE
 router.delete("/:id", async (req, res) => {
   try {
-    await Worker.findByIdAndDelete(req.params.id);
-    await WorkerRecord.deleteMany({ worker: req.params.id });
-    res.json({ message: "Worker and associated records deleted" });
+    await prisma.worker.update({
+      where: {
+        id: Number(req.params.id)
+      },
+      data: {
+        isActive: false
+      }
+    });
+
+    res.json({
+      message: "Worker deactivated successfully"
+    });
+
   } catch (err) {
-    console.error("DELETE /api/workers/:id error:", err);
-    res.status(500).json({ error: "Server error" });
+    console.error(err);
+    res.status(500).json({ error: "Server Error" });
   }
 });
 
