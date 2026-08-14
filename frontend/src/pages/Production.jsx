@@ -1,5 +1,5 @@
-// src/Production.jsx
-import { useState, useEffect } from "react";
+// src/pages/Production.jsx
+import { useState, useEffect, useRef } from "react";
 import api from "../api.js"; // axios instance with baseURL: http://localhost:5000/api
 
 function getWeekNumber(dt) {
@@ -27,6 +27,12 @@ function Production() {
   const [editing, setEditing] = useState(false);
 
   const [filter, setFilter] = useState({ machineId: "", date: "" });
+
+  // --- image upload / view state ---
+  const fileInputRef = useRef(null);
+  const [uploadTargetId, setUploadTargetId] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [imageModal, setImageModal] = useState({ show: false, images: [], recordId: null, machineId: "" });
 
   useEffect(() => {
     fetchMachines(); // initial load sorted newest-first
@@ -143,12 +149,71 @@ function Production() {
     fetchMachines({});
   };
 
+  // --- image upload handlers ---
+  const triggerUpload = (id) => {
+    setUploadTargetId(id);
+    // reset value first so selecting the same file(s) again still fires onChange
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !uploadTargetId) return;
+
+    const formData = new FormData();
+    files.forEach(f => formData.append("images", f));
+
+    setUploading(true);
+    try {
+      await api.post(`/production/${uploadTargetId}/images`, formData);
+      await fetchMachines(filter);
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || "Image upload failed.");
+    } finally {
+      setUploading(false);
+      setUploadTargetId(null);
+    }
+  };
+
+  // --- view images modal handlers ---
+  const openImageModal = (m) => {
+    setImageModal({ show: true, images: m.images || [], recordId: m._id, machineId: m.machineId });
+  };
+
+  const closeImageModal = () => {
+    setImageModal({ show: false, images: [], recordId: null, machineId: "" });
+  };
+
+  const handleDeleteImage = async (url) => {
+    if (!confirm("Remove this image?")) return;
+    try {
+      const res = await api.delete(`/production/${imageModal.recordId}/images`, { data: { url } });
+      setImageModal(im => ({ ...im, images: res.data.images || [] }));
+      fetchMachines(filter);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to remove image.");
+    }
+  };
+
   // build unique machine list for filter select
   const uniqueMachines = Array.from(new Set(machines.map(m => m.machineId))).sort();
 
   return (
     <div className="container-fluid py-4">
       <h1 className="mb-4">Production Management</h1>
+
+      {/* hidden input used for both upload buttons, target row tracked via uploadTargetId */}
+      <input
+        type="file"
+        accept="image/*"
+        multiple
+        ref={fileInputRef}
+        style={{ display: "none" }}
+        onChange={handleFileSelected}
+      />
 
       {/* Form */}
       <div className="row mb-4">
@@ -195,6 +260,11 @@ function Production() {
                   </button>
                 </div>
               </form>
+              {!editing && (
+                <small className="text-muted d-block mt-2">
+                  Save the record first, then use the 📷 Upload button on its row to attach images.
+                </small>
+              )}
             </div>
           </div>
         </div>
@@ -251,6 +321,8 @@ function Production() {
                       const cls = rowClasses[(weekNum % rowClasses.length)];
                       const day = m.dayOfWeek || ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
                       const totalCost = m.totalCost !== undefined ? m.totalCost : (Number(m.sareesProduced||0) * Number(m.costPerSaree||0));
+                      const imageCount = (m.images || []).length;
+                      const isUploadingThisRow = uploading && uploadTargetId === m._id;
 
                       return (
                         <tr key={m._id} className={cls}>
@@ -262,9 +334,19 @@ function Production() {
                           <td>₹{totalCost}</td>
                           <td>{m.warpingCapacity ?? "-"}</td>
                           <td>{m.machineStatus}</td>
-                          <td>
-                            <button className="btn btn-sm btn-warning me-2" onClick={() => handleEdit(m)}>Edit</button>
-                            <button className="btn btn-sm btn-danger" onClick={() => handleDelete(m._id)}>Delete</button>
+                          <td className="text-nowrap">
+                            <button className="btn btn-sm btn-warning me-2 mb-1" onClick={() => handleEdit(m)}>Edit</button>
+                            <button className="btn btn-sm btn-danger me-2 mb-1" onClick={() => handleDelete(m._id)}>Delete</button>
+                            <button
+                              className="btn btn-sm btn-outline-primary me-2 mb-1"
+                              onClick={() => triggerUpload(m._id)}
+                              disabled={isUploadingThisRow}
+                            >
+                              {isUploadingThisRow ? "Uploading..." : "📷 Upload"}
+                            </button>
+                            <button className="btn btn-sm btn-outline-info mb-1" onClick={() => openImageModal(m)}>
+                              🖼 View ({imageCount})
+                            </button>
                           </td>
                         </tr>
                       );
@@ -277,6 +359,52 @@ function Production() {
           </div>
         </div>
       </div>
+
+      {/* View Images Modal */}
+      {imageModal.show && (
+        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Images — {imageModal.machineId}</h5>
+                <button type="button" className="btn-close" onClick={closeImageModal}></button>
+              </div>
+              <div className="modal-body">
+                {imageModal.images.length === 0 ? (
+                  <p className="text-muted mb-0">No images uploaded for this record yet.</p>
+                ) : (
+                  <div className="row g-3">
+                    {imageModal.images.map((url, idx) => (
+                      <div className="col-6 col-md-4" key={idx}>
+                        <div className="position-relative">
+                          <a href={url} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={url}
+                              alt={`production-${idx}`}
+                              className="img-fluid rounded border"
+                              style={{ aspectRatio: "1 / 1", objectFit: "cover", width: "100%" }}
+                            />
+                          </a>
+                          <button
+                            className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
+                            onClick={() => handleDeleteImage(url)}
+                            title="Remove image"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={closeImageModal}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

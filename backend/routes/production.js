@@ -1,6 +1,10 @@
 // backend/routes/production.js
 import express from "express";
+import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { v4 as uuidv4 } from "uuid";
 import Production from "../models/Production.js";
+import s3 from "../config/s3.js";
+import upload from "../middleware/upload.js";
 
 const router = express.Router();
 
@@ -11,6 +15,18 @@ function dayRange(dateStr) {
   const dEnd = new Date(d);
   dEnd.setHours(23,59,59,999);
   return { start: d, end: dEnd };
+}
+
+// helper: build a unique S3 key for an uploaded file, namespaced by machine
+function buildS3Key(machineId, originalName) {
+  const ext = (originalName.split(".").pop() || "jpg").toLowerCase();
+  const safeMachineId = (machineId || "unknown").replace(/[^a-zA-Z0-9-_]/g, "_");
+  return `production/${safeMachineId}/${uuidv4()}.${ext}`;
+}
+
+// helper: build the public URL for a given S3 key
+function buildPublicUrl(key) {
+  return `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 }
 
 // GET /api/production?machineId=&date=&startDate=&endDate=&sort=asc|desc
@@ -151,6 +167,77 @@ router.put("/:id", async (req, res) => {
   } catch (err) {
     console.error("PUT /api/production error:", err);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /api/production/:id/images  -> upload 1-5 images to S3, append URLs to the record
+router.post("/:id/images", (req, res, next) => {
+  // run multer manually so we can return a clean 400 instead of crashing
+  // on file-type/size errors
+  upload.array("images", 5)(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const prod = await Production.findById(req.params.id);
+    if (!prod) return res.status(404).json({ error: "Production record not found" });
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: "No image files provided" });
+    }
+
+    const uploadedUrls = [];
+    for (const file of req.files) {
+      const key = buildS3Key(prod.machineId, file.originalname);
+      await s3.send(new PutObjectCommand({
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      }));
+      uploadedUrls.push(buildPublicUrl(key));
+    }
+
+    prod.images = [...(prod.images || []), ...uploadedUrls];
+    await prod.save();
+
+    res.status(201).json(prod);
+  } catch (err) {
+    console.error("POST /api/production/:id/images error:", err);
+    res.status(500).json({ error: "Failed to upload images" });
+  }
+});
+
+// DELETE /api/production/:id/images  body: { url }  -> remove one image from a record
+router.delete("/:id/images", async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: "Image url is required" });
+
+    const prod = await Production.findById(req.params.id);
+    if (!prod) return res.status(404).json({ error: "Production record not found" });
+
+    const key = url.split(".amazonaws.com/")[1];
+    if (key) {
+      try {
+        await s3.send(new DeleteObjectCommand({
+          Bucket: process.env.S3_BUCKET_NAME,
+          Key: key,
+        }));
+      } catch (s3Err) {
+        // don't block DB cleanup if the S3 object is already gone
+        console.error("S3 delete error (continuing to remove from DB):", s3Err);
+      }
+    }
+
+    prod.images = (prod.images || []).filter(img => img !== url);
+    await prod.save();
+
+    res.json(prod);
+  } catch (err) {
+    console.error("DELETE /api/production/:id/images error:", err);
+    res.status(500).json({ error: "Failed to delete image" });
   }
 });
 
