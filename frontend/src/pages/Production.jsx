@@ -7,22 +7,30 @@ function getWeekNumber(dt) {
   const d = new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
-const rowClasses = ["", "table-secondary", "table-light", "table-info", "table-success", "table-warning", "table-danger"];
+const rowClasses = [
+  "",
+  "table-secondary",
+  "table-light",
+  "table-info",
+  "table-success",
+  "table-warning",
+  "table-danger",
+];
 
 function Production() {
   const [machines, setMachines] = useState([]);
   const [form, setForm] = useState({
     _id: null,
     machineId: "",
-    date: new Date().toISOString().slice(0,10), // YYYY-MM-DD
+    date: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
     sareesProduced: "",
     warpingCapacity: "",
     costPerSaree: "",
-    machineStatus: "ON"
+    machineStatus: "ON",
   });
   const [editing, setEditing] = useState(false);
 
@@ -32,7 +40,12 @@ function Production() {
   const fileInputRef = useRef(null);
   const [uploadTargetId, setUploadTargetId] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [imageModal, setImageModal] = useState({ show: false, images: [], recordId: null, machineId: "" });
+  const [imageModal, setImageModal] = useState({
+    show: false,
+    images: [],
+    recordId: null,
+    machineId: "",
+  });
 
   useEffect(() => {
     fetchMachines(); // initial load sorted newest-first
@@ -57,9 +70,9 @@ function Production() {
     const { name, value } = e.target;
     // if toggling machineStatus to OFF, zero sareesProduced in form
     if (name === "machineStatus" && value === "OFF") {
-      setForm(f => ({ ...f, machineStatus: value, sareesProduced: 0 }));
+      setForm((f) => ({ ...f, machineStatus: value, sareesProduced: 0 }));
     } else {
-      setForm(f => ({ ...f, [name]: value }));
+      setForm((f) => ({ ...f, [name]: value }));
     }
   };
 
@@ -67,27 +80,30 @@ function Production() {
     setForm({
       _id: null,
       machineId: "",
-      date: new Date().toISOString().slice(0,10),
+      date: new Date().toISOString().slice(0, 10),
       sareesProduced: "",
       warpingCapacity: "",
       costPerSaree: "",
-      machineStatus: "ON"
+      machineStatus: "ON",
     });
     setEditing(false);
   };
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!form.machineId || !form.date) return alert("Machine ID and date are required.");
+    if (!form.machineId || !form.date)
+      return alert("Machine ID and date are required.");
     try {
       // convert numeric fields
       const payload = {
         machineId: form.machineId.trim(),
         date: form.date,
-        sareesProduced: form.machineStatus === "OFF" ? 0 : Number(form.sareesProduced || 0),
-        warpingCapacity: form.warpingCapacity === "" ? null : Number(form.warpingCapacity),
+        sareesProduced:
+          form.machineStatus === "OFF" ? 0 : Number(form.sareesProduced || 0),
+        warpingCapacity:
+          form.warpingCapacity === "" ? null : Number(form.warpingCapacity),
         costPerSaree: Number(form.costPerSaree || 0),
-        machineStatus: form.machineStatus
+        machineStatus: form.machineStatus,
       };
       await api.post("/production", payload);
       resetForm();
@@ -101,11 +117,11 @@ function Production() {
     setForm({
       _id: m._id,
       machineId: m.machineId,
-      date: new Date(m.date).toISOString().slice(0,10),
+      date: new Date(m.date).toISOString().slice(0, 10),
       sareesProduced: m.sareesProduced,
       warpingCapacity: m.warpingCapacity || "",
       costPerSaree: m.costPerSaree || "",
-      machineStatus: m.machineStatus || "ON"
+      machineStatus: m.machineStatus || "ON",
     });
     setEditing(true);
   };
@@ -117,10 +133,12 @@ function Production() {
       const payload = {
         machineId: form.machineId.trim(),
         date: form.date,
-        sareesProduced: form.machineStatus === "OFF" ? 0 : Number(form.sareesProduced || 0),
-        warpingCapacity: form.warpingCapacity === "" ? null : Number(form.warpingCapacity),
+        sareesProduced:
+          form.machineStatus === "OFF" ? 0 : Number(form.sareesProduced || 0),
+        warpingCapacity:
+          form.warpingCapacity === "" ? null : Number(form.warpingCapacity),
         costPerSaree: Number(form.costPerSaree || 0),
-        machineStatus: form.machineStatus
+        machineStatus: form.machineStatus,
       };
       await api.put(`/production/${form._id}`, payload);
       resetForm();
@@ -162,7 +180,7 @@ function Production() {
     if (!files.length || !uploadTargetId) return;
 
     const formData = new FormData();
-    files.forEach(f => formData.append("images", f));
+    files.forEach((f) => formData.append("images", f));
 
     setUploading(true);
     try {
@@ -179,27 +197,41 @@ function Production() {
 
   // --- view images modal handlers ---
   const openImageModal = (m) => {
-    setImageModal({ show: true, images: m.images || [], recordId: m._id, machineId: m.machineId });
+    setImageModal({
+      show: true,
+      images: m.images || [],
+      recordId: m._id,
+      machineId: m.machineId,
+    });
   };
 
   const closeImageModal = () => {
     setImageModal({ show: false, images: [], recordId: null, machineId: "" });
   };
 
-  const handleDeleteImage = async (url) => {
+  const handleDeleteImage = async (key) => {
     if (!confirm("Remove this image?")) return;
+
     try {
-      const res = await api.delete(`/production/${imageModal.recordId}/images`, { data: { url } });
-      setImageModal(im => ({ ...im, images: res.data.images || [] }));
-      fetchMachines(filter);
+      await api.delete(`/production/${imageModal.recordId}/images`, {
+        data: { key },
+      });
+
+      await fetchMachines(filter);
+
+      setImageModal((im) => ({
+        ...im,
+        images: im.images.filter((image) => image.key !== key),
+      }));
     } catch (err) {
       console.error(err);
       alert("Failed to remove image.");
     }
   };
-
   // build unique machine list for filter select
-  const uniqueMachines = Array.from(new Set(machines.map(m => m.machineId))).sort();
+  const uniqueMachines = Array.from(
+    new Set(machines.map((m) => m.machineId)),
+  ).sort();
 
   return (
     <div className="container-fluid py-4">
@@ -220,20 +252,41 @@ function Production() {
         <div className="col-12">
           <div className="card shadow-sm">
             <div className="card-body">
-              <form onSubmit={editing ? handleUpdate : handleAdd} className="row g-3 align-items-end">
+              <form
+                onSubmit={editing ? handleUpdate : handleAdd}
+                className="row g-3 align-items-end"
+              >
                 <div className="col-md-2">
                   <label className="form-label">Machine ID</label>
-                  <input type="text" name="machineId" value={form.machineId} onChange={handleChange} className="form-control" placeholder="LM-01" />
+                  <input
+                    type="text"
+                    name="machineId"
+                    value={form.machineId}
+                    onChange={handleChange}
+                    className="form-control"
+                    placeholder="LM-01"
+                  />
                 </div>
 
                 <div className="col-md-2">
                   <label className="form-label">Date</label>
-                  <input type="date" name="date" value={form.date} onChange={handleChange} className="form-control" />
+                  <input
+                    type="date"
+                    name="date"
+                    value={form.date}
+                    onChange={handleChange}
+                    className="form-control"
+                  />
                 </div>
 
                 <div className="col-md-2">
                   <label className="form-label">Machine Status</label>
-                  <select name="machineStatus" value={form.machineStatus} onChange={handleChange} className="form-select">
+                  <select
+                    name="machineStatus"
+                    value={form.machineStatus}
+                    onChange={handleChange}
+                    className="form-select"
+                  >
                     <option value="ON">ON</option>
                     <option value="OFF">OFF</option>
                   </select>
@@ -241,28 +294,54 @@ function Production() {
 
                 <div className="col-md-2">
                   <label className="form-label">Sarees Produced</label>
-                  <input type="number" name="sareesProduced" value={form.sareesProduced} onChange={handleChange} className="form-control" disabled={form.machineStatus === "OFF"} placeholder="0" />
+                  <input
+                    type="number"
+                    name="sareesProduced"
+                    value={form.sareesProduced}
+                    onChange={handleChange}
+                    className="form-control"
+                    disabled={form.machineStatus === "OFF"}
+                    placeholder="0"
+                  />
                 </div>
 
                 <div className="col-md-2">
                   <label className="form-label">Warping Capacity</label>
-                  <input type="number" name="warpingCapacity" value={form.warpingCapacity} onChange={handleChange} className="form-control" placeholder="50" />
+                  <input
+                    type="number"
+                    name="warpingCapacity"
+                    value={form.warpingCapacity}
+                    onChange={handleChange}
+                    className="form-control"
+                    placeholder="50"
+                  />
                 </div>
 
                 <div className="col-md-1">
                   <label className="form-label">Cost/Saree</label>
-                  <input type="number" name="costPerSaree" value={form.costPerSaree} onChange={handleChange} className="form-control" placeholder="₹" />
+                  <input
+                    type="number"
+                    name="costPerSaree"
+                    value={form.costPerSaree}
+                    onChange={handleChange}
+                    className="form-control"
+                    placeholder="₹"
+                  />
                 </div>
 
                 <div className="col-md-1 d-grid">
-                  <button className={`btn ${editing ? "btn-warning" : "btn-primary"}`} type="submit">
+                  <button
+                    className={`btn ${editing ? "btn-warning" : "btn-primary"}`}
+                    type="submit"
+                  >
                     {editing ? "Update" : "Add"}
                   </button>
                 </div>
               </form>
               {!editing && (
                 <small className="text-muted d-block mt-2">
-                  Save the record first, then use the 📷 Upload button on its row to attach images.
+                  Save the record first, then use the 📷 Upload button on its
+                  row to attach images.
                 </small>
               )}
             </div>
@@ -273,19 +352,38 @@ function Production() {
       {/* Filters */}
       <div className="row mb-3">
         <div className="col-md-3">
-          <select className="form-select" value={filter.machineId} onChange={(e) => setFilter(f => ({ ...f, machineId: e.target.value }))}>
+          <select
+            className="form-select"
+            value={filter.machineId}
+            onChange={(e) =>
+              setFilter((f) => ({ ...f, machineId: e.target.value }))
+            }
+          >
             <option value="">Filter by Machine (All)</option>
-            {uniqueMachines.map(m => <option key={m} value={m}>{m}</option>)}
+            {uniqueMachines.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
           </select>
         </div>
 
         <div className="col-md-3">
-          <input type="date" className="form-control" value={filter.date} onChange={(e) => setFilter(f => ({ ...f, date: e.target.value }))} />
+          <input
+            type="date"
+            className="form-control"
+            value={filter.date}
+            onChange={(e) => setFilter((f) => ({ ...f, date: e.target.value }))}
+          />
         </div>
 
         <div className="col-md-6 d-flex gap-2">
-          <button className="btn btn-outline-primary" onClick={applyFilter}>Apply Filter</button>
-          <button className="btn btn-outline-secondary" onClick={resetFilter}>Reset</button>
+          <button className="btn btn-outline-primary" onClick={applyFilter}>
+            Apply Filter
+          </button>
+          <button className="btn btn-outline-secondary" onClick={resetFilter}>
+            Reset
+          </button>
         </div>
       </div>
 
@@ -312,17 +410,30 @@ function Production() {
                   </thead>
                   <tbody>
                     {machines.length === 0 && (
-                      <tr><td colSpan="9" className="text-center text-muted">No records found</td></tr>
+                      <tr>
+                        <td colSpan="9" className="text-center text-muted">
+                          No records found
+                        </td>
+                      </tr>
                     )}
 
                     {machines.map((m) => {
                       const d = new Date(m.date);
                       const weekNum = getWeekNumber(d);
-                      const cls = rowClasses[(weekNum % rowClasses.length)];
-                      const day = m.dayOfWeek || ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
-                      const totalCost = m.totalCost !== undefined ? m.totalCost : (Number(m.sareesProduced||0) * Number(m.costPerSaree||0));
+                      const cls = rowClasses[weekNum % rowClasses.length];
+                      const day =
+                        m.dayOfWeek ||
+                        ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+                          d.getDay()
+                        ];
+                      const totalCost =
+                        m.totalCost !== undefined
+                          ? m.totalCost
+                          : Number(m.sareesProduced || 0) *
+                            Number(m.costPerSaree || 0);
                       const imageCount = (m.images || []).length;
-                      const isUploadingThisRow = uploading && uploadTargetId === m._id;
+                      const isUploadingThisRow =
+                        uploading && uploadTargetId === m._id;
 
                       return (
                         <tr key={m._id} className={cls}>
@@ -335,16 +446,31 @@ function Production() {
                           <td>{m.warpingCapacity ?? "-"}</td>
                           <td>{m.machineStatus}</td>
                           <td className="text-nowrap">
-                            <button className="btn btn-sm btn-warning me-2 mb-1" onClick={() => handleEdit(m)}>Edit</button>
-                            <button className="btn btn-sm btn-danger me-2 mb-1" onClick={() => handleDelete(m._id)}>Delete</button>
+                            <button
+                              className="btn btn-sm btn-warning me-2 mb-1"
+                              onClick={() => handleEdit(m)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="btn btn-sm btn-danger me-2 mb-1"
+                              onClick={() => handleDelete(m._id)}
+                            >
+                              Delete
+                            </button>
                             <button
                               className="btn btn-sm btn-outline-primary me-2 mb-1"
                               onClick={() => triggerUpload(m._id)}
                               disabled={isUploadingThisRow}
                             >
-                              {isUploadingThisRow ? "Uploading..." : "📷 Upload"}
+                              {isUploadingThisRow
+                                ? "Uploading..."
+                                : "📷 Upload"}
                             </button>
-                            <button className="btn btn-sm btn-outline-info mb-1" onClick={() => openImageModal(m)}>
+                            <button
+                              className="btn btn-sm btn-outline-info mb-1"
+                              onClick={() => openImageModal(m)}
+                            >
                               🖼 View ({imageCount})
                             </button>
                           </td>
@@ -354,7 +480,9 @@ function Production() {
                   </tbody>
                 </table>
               </div>
-              <small className="text-muted mt-2 d-block">Rows colored by week groups for easy weekly scanning.</small>
+              <small className="text-muted mt-2 d-block">
+                Rows colored by week groups for easy weekly scanning.
+              </small>
             </div>
           </div>
         </div>
@@ -362,32 +490,51 @@ function Production() {
 
       {/* View Images Modal */}
       {imageModal.show && (
-        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+        <div
+          className="modal d-block"
+          tabIndex="-1"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+        >
           <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Images — {imageModal.machineId}</h5>
-                <button type="button" className="btn-close" onClick={closeImageModal}></button>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={closeImageModal}
+                ></button>
               </div>
               <div className="modal-body">
                 {imageModal.images.length === 0 ? (
-                  <p className="text-muted mb-0">No images uploaded for this record yet.</p>
+                  <p className="text-muted mb-0">
+                    No images uploaded for this record yet.
+                  </p>
                 ) : (
                   <div className="row g-3">
-                    {imageModal.images.map((url, idx) => (
-                      <div className="col-6 col-md-4" key={idx}>
+                    {imageModal.images.map((image, idx) => (
+                      <div className="col-6 col-md-4" key={image.key}>
                         <div className="position-relative">
-                          <a href={url} target="_blank" rel="noopener noreferrer">
+                          <a
+                            href={image.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             <img
-                              src={url}
+                              src={image.url}
                               alt={`production-${idx}`}
                               className="img-fluid rounded border"
-                              style={{ aspectRatio: "1 / 1", objectFit: "cover", width: "100%" }}
+                              style={{
+                                aspectRatio: "1 / 1",
+                                objectFit: "cover",
+                                width: "100%",
+                              }}
                             />
                           </a>
+
                           <button
                             className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
-                            onClick={() => handleDeleteImage(url)}
+                            onClick={() => handleDeleteImage(image.key)}
                             title="Remove image"
                           >
                             &times;
@@ -399,7 +546,9 @@ function Production() {
                 )}
               </div>
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={closeImageModal}>Close</button>
+                <button className="btn btn-secondary" onClick={closeImageModal}>
+                  Close
+                </button>
               </div>
             </div>
           </div>
