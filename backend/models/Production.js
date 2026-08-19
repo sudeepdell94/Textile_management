@@ -10,7 +10,7 @@ const productionSchema = new mongoose.Schema({
   costPerSaree: { type: Number, default: 0 },                         // Cost per saree
   totalCost: { type: Number, default: 0 },                             // Computed: sareesProduced * costPerSaree
   machineStatus: { type: String, enum: ["ON","OFF"], default: "ON" }, // Machine status
-  images: { type: [String], default: [] },                            // S3 URLs of uploaded images
+  images: { type: [String], default: [] },                            // S3 key of uploaded images
   createdAt: { type: Date, default: Date.now }
 });
 
