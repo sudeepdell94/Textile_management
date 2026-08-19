@@ -235,7 +235,7 @@ function Production() {
 
   return (
     <div className="container-fluid py-4">
-      <h1 className="mb-4">Production Managements</h1>
+      <h1 className="mb-4">Production Management</h1>
 
       {/* hidden input used for both upload buttons, target row tracked via uploadTargetId */}
       <input
