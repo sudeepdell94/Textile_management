@@ -25,7 +25,7 @@ jobs:
           nc -zv -w 10 "${{ secrets.EC2_HOST }}" 22
           echo "EC2 port 22 is reachable"
           ssh-keyscan -T 10 -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
-          echo "SSH host key collected"
+          echo "SSH host key collected sucessfully"
 
       - name: Deploy application to EC2
         run: |
