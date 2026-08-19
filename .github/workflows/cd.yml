@@ -14,18 +14,18 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      - name: Configure SSH
+      - name: Test EC2 network connectivity
         run: |
-          mkdir -p ~/.ssh
+            echo "GitHub runner public IP:"
+            curl -s https://checkip.amazonaws.com
+            echo
 
-          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/textile.pem
+            echo "Testing EC2 port 22..."
 
-          chmod 600 ~/.ssh/textile.pem
-          echo "Testing EC2 connectivity..."
-          nc -zv -w 10 "${{ secrets.EC2_HOST }}" 22
-          echo "EC2 port 22 is reachable"
-          ssh-keyscan -T 10 -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
-          echo "SSH host key collected sucessfully"
+            nc -zv -w 10 "${{ secrets.EC2_HOST }}" 22
+
+            echo "EC2 port 22 is reachable"
+
 
       - name: Deploy application to EC2
         run: |
