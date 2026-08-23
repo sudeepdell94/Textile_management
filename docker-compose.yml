@@ -1,6 +1,6 @@
 services:
   backend:
-    image: 177203142319.dkr.ecr.ap-south-1.amazonaws.com/textile-backend:latest
+    image: 177203142319.dkr.ecr.ap-south-1.amazonaws.com/textile-backend:${IMAGE_TAG}
     container_name: textile-backend
     expose:
       - "5000"
@@ -9,7 +9,7 @@ services:
     restart: always
 
   frontend:
-    image: 177203142319.dkr.ecr.ap-south-1.amazonaws.com/textile-frontend:latest
+    image: 177203142319.dkr.ecr.ap-south-1.amazonaws.com/textile-frontend:${IMAGE_TAG}
     container_name: textile-frontend
     expose:          # ✅ expose, NOT ports
       - "80"
