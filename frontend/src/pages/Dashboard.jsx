@@ -100,14 +100,14 @@ export default function Dashboard() {
 
   return (
     <div className="container-fluid py-4 dashboard-container">
-      <h1 className="mb-4">Dashboard</h1>
+      <h1 className="mb-4">Dashboards</h1>
 
       {/* Summary Cards */}
       <div className="row mb-4 g-3">
         <div className="col-md-4">
           <div className="card shadow-sm h-100 border-success">
             <div className="card-body text-center">
-              <h6 className="text-muted">Sarees Today</h6>
+              <h6 className="text-muted">Sarees Todays</h6>
               <p className="display-6 text-success">{totalToday}</p>
             </div>
           </div>
