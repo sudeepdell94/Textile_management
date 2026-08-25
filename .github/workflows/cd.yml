@@ -59,9 +59,10 @@ jobs:
       - name: Deploy application to EC2
         run: |
           ssh -i ~/.ssh/textile.pem \
-            ubuntu@${{ secrets.EC2_HOST }} << EOF
+            ubuntu@${{ secrets.EC2_HOST }} \
+            "IMAGE_TAG='$IMAGE_TAG' bash -s" << 'EOF'
 
-          set -e
+          set -euo pipefail
 
           echo "======================================"
           echo "Starting Textile deployment"
@@ -81,11 +82,11 @@ jobs:
 
           echo "Pulling Docker images for SHA: $IMAGE_TAG"
 
-          IMAGE_TAG=$IMAGE_TAG docker compose pull
+          IMAGE_TAG="$IMAGE_TAG" docker compose pull
 
           echo "Recreating application containers..."
 
-          IMAGE_TAG=$IMAGE_TAG docker compose up -d --force-recreate
+          IMAGE_TAG="$IMAGE_TAG" docker compose up -d --force-recreate
 
           echo "Restarting Nginx to refresh upstreams..."
 
@@ -93,7 +94,7 @@ jobs:
 
           echo "Checking container status..."
 
-          IMAGE_TAG=$IMAGE_TAG docker compose ps
+          IMAGE_TAG="$IMAGE_TAG" docker compose ps
 
           echo "======================================"
           echo "Running application health checks"
@@ -102,28 +103,30 @@ jobs:
 
           echo "Checking frontend..."
 
-          for i in {1..6}; do
+          attempt=1
+          max_attempts=6
+
+          while [ "$attempt" -le "$max_attempts" ]; do
             if curl -fsS http://localhost/ > /dev/null; then
               echo "Frontend health check: PASS"
               break
             fi
 
-            if [ "$i" -eq 6 ]; then
+            if [ "$attempt" -eq "$max_attempts" ]; then
               echo "Frontend health check: FAILED"
               exit 1
             fi
 
             echo "Frontend not ready. Retrying in 5 seconds..."
             sleep 5
+            attempt=$((attempt + 1))
           done
 
           echo "Checking backend..."
 
           attempt=1
-          max_attempts=6
 
           while [ "$attempt" -le "$max_attempts" ]; do
-
             if curl -fsS http://localhost/api/health > /dev/null; then
               echo "Backend health check: PASS"
               break
@@ -136,7 +139,6 @@ jobs:
 
             echo "Backend not ready. Retrying in 5 seconds..."
             sleep 5
-
             attempt=$((attempt + 1))
           done
 
