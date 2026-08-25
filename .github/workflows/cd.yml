@@ -71,6 +71,29 @@ jobs:
 
           cd /opt/textile
 
+          echo "Reading deployment history..."
+
+          HISTORY_FILE="/opt/textile/deployment-history.log"
+
+          if [ ! -f "$HISTORY_FILE" ]; then
+            echo "Deployment history file not found"
+            exit 1
+          fi
+
+          ROLLBACK_SHA=$(grep '|SUCCESS$' "$HISTORY_FILE" | tail -n 1 | cut -d'|' -f2)
+
+          if [ -z "$ROLLBACK_SHA" ]; then
+            echo "No previous successful deployment found"
+            exit 1
+          fi
+
+          echo "Previous successful SHA: $ROLLBACK_SHA"
+
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$IMAGE_TAG|STARTED" \
+            >> "$HISTORY_FILE"
+
+          echo "Deployment recorded as STARTED"
+
           echo "Logging into Amazon ECR..."
 
           aws ecr get-login-password \
