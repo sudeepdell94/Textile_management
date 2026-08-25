@@ -91,12 +91,52 @@ jobs:
 
           docker restart textile-nginx
 
-          echo "Checking deployment..."
+          echo "Checking container status..."
 
           IMAGE_TAG=$IMAGE_TAG docker compose ps
 
           echo "======================================"
-          echo "Deployment completed"
+          echo "Running application health checks"
+          echo "Deployment SHA: $IMAGE_TAG"
+          echo "======================================"
+
+          echo "Checking frontend..."
+
+          for i in {1..6}; do
+            if curl -fsS http://localhost/ > /dev/null; then
+              echo "Frontend health check: PASS"
+              break
+            fi
+
+            if [ "$i" -eq 6 ]; then
+              echo "Frontend health check: FAILED"
+              exit 1
+            fi
+
+            echo "Frontend not ready. Retrying in 5 seconds..."
+            sleep 5
+          done
+
+          echo "Checking backend..."
+
+          for i in {1..6}; do
+            if curl -fsS http://localhost/api/health > /dev/null; then
+              echo "Backend health check: PASS"
+              break
+            fi
+
+            if [ "$i" -eq 6 ]; then
+              echo "Backend health check: FAILED"
+              exit 1
+            fi
+
+            echo "Backend not ready. Retrying in 5 seconds..."
+            sleep 5
+          done
+
+          echo "======================================"
+          echo "All health checks passed"
+          echo "Deployment successful"
           echo "SHA: $IMAGE_TAG"
           echo "======================================"
 
