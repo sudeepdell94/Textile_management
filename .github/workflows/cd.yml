@@ -171,4 +171,9 @@ jobs:
           echo "SHA: $IMAGE_TAG"
           echo "======================================"
 
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$IMAGE_TAG|SUCCESS" \
+            >> "$HISTORY_FILE"
+
+          echo "Deployment recorded as SUCCESS"
+
           EOF
