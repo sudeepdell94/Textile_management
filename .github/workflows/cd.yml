@@ -119,19 +119,25 @@ jobs:
 
           echo "Checking backend..."
 
-          for i in {1..6}; do
+          attempt=1
+          max_attempts=6
+
+          while [ "$attempt" -le "$max_attempts" ]; do
+
             if curl -fsS http://localhost/api/health > /dev/null; then
               echo "Backend health check: PASS"
               break
             fi
 
-            if [ "$i" -eq 6 ]; then
+            if [ "$attempt" -eq "$max_attempts" ]; then
               echo "Backend health check: FAILED"
               exit 1
             fi
 
             echo "Backend not ready. Retrying in 5 seconds..."
             sleep 5
+
+            attempt=$((attempt + 1))
           done
 
           echo "======================================"
