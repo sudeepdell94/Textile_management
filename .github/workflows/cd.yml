@@ -55,8 +55,8 @@ jobs:
 
           echo "Private key exists"
 
-            - name: Deploy application to EC2
-          run: |
+      - name: Deploy application to EC2
+        run: |
           ssh -i ~/.ssh/textile.pem \
             ubuntu@${{ secrets.EC2_HOST }} \
             "IMAGE_TAG='$IMAGE_TAG' bash -s" << 'EOF'
@@ -267,7 +267,7 @@ jobs:
 
           while [ "$attempt" -le "$max_attempts" ]; do
 
-            if curl -fsS http://localhost/api/health > /dev/null; then
+            if curl -fsS http://localhost/api/THIS-WILL-FAIL > /dev/null; then
               echo "Backend health check: PASS"
               break
             fi
