@@ -7,7 +7,7 @@ on:
       - completed
 
 # Prevent two production deployments from running at the same time.
-# If B is deploying, C waits for B to finish.
+# If B is deploying, C waits for B to finish....
 concurrency:
   group: production-deployment
   cancel-in-progress: false
