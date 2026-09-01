@@ -6,6 +6,8 @@ on:
     types:
       - completed
 
+# Prevent two production deployments from running at the same time.
+# If B is deploying, C waits for B to finish....
 concurrency:
   group: production-deployment
   cancel-in-progress: false
@@ -15,9 +17,15 @@ jobs:
     name: Deploy to EC2
     runs-on: ubuntu-latest
 
+    # CD runs only when the CI workflow completed successfully.
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
+
+      # ============================================================
+      # STEP 1: Determine the Docker image tag
+      # ============================================================
+
       - name: Set deployment version
         run: |
           IMAGE_TAG="${GITHUB_EVENT_WORKFLOW_RUN_HEAD_SHA:0:7}"
@@ -27,8 +35,14 @@ jobs:
           echo "======================================"
           echo "Deployment version: $IMAGE_TAG"
           echo "======================================"
+
         env:
           GITHUB_EVENT_WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
+
+      # ============================================================
+      # STEP 2: Configure SSH
+      # ============================================================
 
       - name: Configure SSH
         run: |
@@ -55,6 +69,11 @@ jobs:
 
           echo "Private key exists"
 
+
+      # ============================================================
+      # STEP 3: Deploy application
+      # ============================================================
+
       - name: Deploy application to EC2
         run: |
           ssh -i ~/.ssh/textile.pem \
@@ -63,32 +82,70 @@ jobs:
 
           set -euo pipefail
 
+          # ========================================================
+          # Configuration
+          # ========================================================
+
           HISTORY_FILE="/opt/textile/deployment-history.log"
-          ROLLBACK_IN_PROGRESS=false
+
+          ECR_REGISTRY="177203142319.dkr.ecr.ap-south-1.amazonaws.com"
+
+          AWS_REGION="ap-south-1"
+
+
+          # ========================================================
+          # Validate IMAGE_TAG
+          # ========================================================
 
           if [ -z "$IMAGE_TAG" ]; then
             echo "ERROR: IMAGE_TAG is empty"
             exit 1
           fi
 
+
+          # ========================================================
+          # Move to application directory
+          # ========================================================
+
           cd /opt/textile
 
+
+          # ========================================================
+          # Validate deployment history
+          # ========================================================
+
           if [ ! -f "$HISTORY_FILE" ]; then
-            echo "ERROR: Deployment history file not found"
+            echo "ERROR: Deployment history file not found:"
+            echo "$HISTORY_FILE"
             exit 1
           fi
 
-          ROLLBACK_SHA=$(grep '|SUCCESS$' "$HISTORY_FILE" | tail -n 1 | cut -d'|' -f2)
+
+          # ========================================================
+          # Find previous successful deployment
+          # ========================================================
+
+          ROLLBACK_SHA=$(grep '|SUCCESS$' "$HISTORY_FILE" \
+            | tail -n 1 \
+            | cut -d'|' -f2)
+
 
           if [ -z "$ROLLBACK_SHA" ]; then
             echo "ERROR: No previous successful deployment found"
             exit 1
           fi
 
+
+          # Prevent accidentally rolling back to the same version.
           if [ "$ROLLBACK_SHA" = "$IMAGE_TAG" ]; then
             echo "ERROR: Rollback SHA is same as deployment SHA"
             exit 1
           fi
+
+
+          # ========================================================
+          # Display deployment information
+          # ========================================================
 
           echo "======================================"
           echo "Starting Textile deployment"
@@ -96,141 +153,67 @@ jobs:
           echo "Rollback SHA: $ROLLBACK_SHA"
           echo "======================================"
 
+
+          # ========================================================
+          # Record deployment STARTED
+          # ========================================================
+
           echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$IMAGE_TAG|STARTED" \
             >> "$HISTORY_FILE"
 
-          rollback() {
 
-            if [ "$ROLLBACK_IN_PROGRESS" = true ]; then
-              echo "Rollback already in progress"
-              return
-            fi
-
-            ROLLBACK_IN_PROGRESS=true
-
-            echo "======================================"
-            echo "DEPLOYMENT FAILED"
-            echo "Failed SHA: $IMAGE_TAG"
-            echo "Rollback SHA: $ROLLBACK_SHA"
-            echo "======================================"
-
-            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$IMAGE_TAG|FAILED" \
-              >> "$HISTORY_FILE"
-
-            echo "Starting rollback to $ROLLBACK_SHA"
-
-            if ! IMAGE_TAG="$ROLLBACK_SHA" docker compose pull; then
-              echo "ERROR: Failed to pull rollback images"
-
-              echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$ROLLBACK_SHA|ROLLBACK_FAILED" \
-                >> "$HISTORY_FILE"
-
-              return 1
-            fi
-
-            if ! IMAGE_TAG="$ROLLBACK_SHA" docker compose up -d --force-recreate; then
-              echo "ERROR: Failed to start rollback containers"
-
-              echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$ROLLBACK_SHA|ROLLBACK_FAILED" \
-                >> "$HISTORY_FILE"
-
-              return 1
-            fi
-
-            docker restart textile-nginx
-
-            echo "Checking rollback frontend..."
-
-            attempt=1
-            max_attempts=6
-
-            while [ "$attempt" -le "$max_attempts" ]; do
-
-              if curl -fsS http://localhost/ > /dev/null; then
-                echo "Rollback frontend health check: PASS"
-                break
-              fi
-
-              if [ "$attempt" -eq "$max_attempts" ]; then
-                echo "Rollback frontend health check: FAILED"
-
-                echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$ROLLBACK_SHA|ROLLBACK_FAILED" \
-                  >> "$HISTORY_FILE"
-
-                return 1
-              fi
-
-              echo "Rollback frontend not ready. Retrying in 5 seconds..."
-
-              sleep 5
-              attempt=$((attempt + 1))
-
-            done
-
-            echo "Checking rollback backend..."
-
-            attempt=1
-
-            while [ "$attempt" -le "$max_attempts" ]; do
-
-              if curl -fsS http://localhost/api/health > /dev/null; then
-                echo "Rollback backend health check: PASS"
-                break
-              fi
-
-              if [ "$attempt" -eq "$max_attempts" ]; then
-                echo "Rollback backend health check: FAILED"
-
-                echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$ROLLBACK_SHA|ROLLBACK_FAILED" \
-                  >> "$HISTORY_FILE"
-
-                return 1
-              fi
-
-              echo "Rollback backend not ready. Retrying in 5 seconds..."
-
-              sleep 5
-              attempt=$((attempt + 1))
-
-            done
-
-            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$ROLLBACK_SHA|ROLLBACK_SUCCESS" \
-              >> "$HISTORY_FILE"
-
-            echo "======================================"
-            echo "ROLLBACK SUCCESSFUL"
-            echo "Restored SHA: $ROLLBACK_SHA"
-            echo "======================================"
-
-            return 0
-          }
-
-          trap 'rollback' ERR
+          # ========================================================
+          # Login to Amazon ECR
+          # ========================================================
 
           echo "Logging into Amazon ECR..."
 
           aws ecr get-login-password \
-            --region ap-south-1 | \
+            --region "$AWS_REGION" | \
           docker login \
             --username AWS \
-            --password-stdin \
-            177203142319.dkr.ecr.ap-south-1.amazonaws.com
+            --password-stdin "$ECR_REGISTRY"
+
+
+          # ========================================================
+          # Pull NEW deployment images
+          # ========================================================
 
           echo "Pulling Docker images for SHA: $IMAGE_TAG"
 
           IMAGE_TAG="$IMAGE_TAG" docker compose pull
 
+
+          # ========================================================
+          # Deploy NEW version
+          # ========================================================
+
           echo "Recreating application containers..."
 
           IMAGE_TAG="$IMAGE_TAG" docker compose up -d --force-recreate
+
+
+          # ========================================================
+          # Restart Nginx
+          # ========================================================
 
           echo "Restarting Nginx to refresh upstreams..."
 
           docker restart textile-nginx
 
+
+          # ========================================================
+          # Show container status
+          # ========================================================
+
           echo "Checking container status..."
 
           IMAGE_TAG="$IMAGE_TAG" docker compose ps
+
+
+          # ========================================================
+          # FRONTEND HEALTH CHECK
+          # ========================================================
 
           echo "======================================"
           echo "Running application health checks"
@@ -242,55 +225,332 @@ jobs:
           attempt=1
           max_attempts=6
 
+          frontend_healthy=false
+
           while [ "$attempt" -le "$max_attempts" ]; do
 
             if curl -fsS http://localhost/ > /dev/null; then
+
               echo "Frontend health check: PASS"
+
+              frontend_healthy=true
+
               break
+
             fi
 
             if [ "$attempt" -eq "$max_attempts" ]; then
+
               echo "Frontend health check: FAILED"
-              exit 1
+
+              frontend_healthy=false
+
+              break
+
             fi
 
             echo "Frontend not ready. Retrying in 5 seconds..."
 
             sleep 5
+
             attempt=$((attempt + 1))
 
           done
 
-          echo "Checking backend..."
+
+          # ========================================================
+          # BACKEND HEALTH CHECK
+          # ========================================================
+
+          if [ "$frontend_healthy" = true ]; then
+
+            echo "Checking backend..."
+
+            attempt=1
+
+            backend_healthy=false
+
+            while [ "$attempt" -le "$max_attempts" ]; do
+
+              if curl -fsS http://localhost/api/health > /dev/null; then
+
+                echo "Backend health check: PASS"
+
+                backend_healthy=true
+
+                break
+
+              fi
+
+              if [ "$attempt" -eq "$max_attempts" ]; then
+
+                echo "Backend health check: FAILED"
+
+                backend_healthy=false
+
+                break
+
+              fi
+
+              echo "Backend not ready. Retrying in 5 seconds..."
+
+              sleep 5
+
+              attempt=$((attempt + 1))
+
+            done
+
+          else
+
+            backend_healthy=false
+
+          fi
+
+
+          # ========================================================
+          # SUCCESS PATH
+          # ========================================================
+
+          if [ "$frontend_healthy" = true ] \
+             && [ "$backend_healthy" = true ]; then
+
+            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$IMAGE_TAG|SUCCESS" \
+              >> "$HISTORY_FILE"
+
+            echo "======================================"
+            echo "All health checks passed"
+            echo "Deployment successful"
+            echo "SHA: $IMAGE_TAG"
+            echo "======================================"
+
+            exit 0
+
+          fi
+
+
+          # ========================================================
+          # DEPLOYMENT FAILURE
+          # ========================================================
+
+          echo "======================================"
+          echo "DEPLOYMENT FAILED"
+          echo "Failed SHA: $IMAGE_TAG"
+          echo "Rollback SHA: $ROLLBACK_SHA"
+          echo "======================================"
+
+
+          # Record failed deployment.
+
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$IMAGE_TAG|FAILED" \
+            >> "$HISTORY_FILE"
+
+
+          # ========================================================
+          # START AUTOMATIC ROLLBACK
+          # ========================================================
+
+          echo "======================================"
+          echo "Starting automatic rollback"
+          echo "Rollback SHA: $ROLLBACK_SHA"
+          echo "======================================"
+
+
+          # ========================================================
+          # Pull rollback images
+          # ========================================================
+
+          echo "Pulling rollback images..."
+
+          if ! IMAGE_TAG="$ROLLBACK_SHA" docker compose pull; then
+
+            echo "ERROR: Failed to pull rollback images"
+
+            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$ROLLBACK_SHA|ROLLBACK_FAILED" \
+              >> "$HISTORY_FILE"
+
+            exit 1
+
+          fi
+
+
+          # ========================================================
+          # Deploy rollback version
+          # ========================================================
+
+          echo "Recreating containers with rollback SHA..."
+
+          if ! IMAGE_TAG="$ROLLBACK_SHA" docker compose up -d --force-recreate; then
+
+            echo "ERROR: Failed to start rollback containers"
+
+            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$ROLLBACK_SHA|ROLLBACK_FAILED" \
+              >> "$HISTORY_FILE"
+
+            exit 1
+
+          fi
+
+
+          # ========================================================
+          # Restart Nginx after rollback
+          # ========================================================
+
+          echo "Restarting Nginx after rollback..."
+
+          if ! docker restart textile-nginx; then
+
+            echo "ERROR: Failed to restart Nginx during rollback"
+
+            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$ROLLBACK_SHA|ROLLBACK_FAILED" \
+              >> "$HISTORY_FILE"
+
+            exit 1
+
+          fi
+
+
+          # ========================================================
+          # Show rollback container status
+          # ========================================================
+
+          echo "Checking rollback container status..."
+
+          IMAGE_TAG="$ROLLBACK_SHA" docker compose ps
+
+
+          # ========================================================
+          # ROLLBACK FRONTEND HEALTH CHECK
+          # ========================================================
+
+          echo "======================================"
+          echo "Checking rollback health"
+          echo "Rollback SHA: $ROLLBACK_SHA"
+          echo "======================================"
+
+          echo "Checking rollback frontend..."
 
           attempt=1
+          max_attempts=6
+
+          rollback_frontend_healthy=false
 
           while [ "$attempt" -le "$max_attempts" ]; do
 
-            if curl -fsS http://localhost/api/THIS-WILL-FAIL > /dev/null; then
-              echo "Backend health check: PASS"
+            if curl -fsS http://localhost/ > /dev/null; then
+
+              echo "Rollback frontend health check: PASS"
+
+              rollback_frontend_healthy=true
+
               break
+
             fi
 
             if [ "$attempt" -eq "$max_attempts" ]; then
-              echo "Backend health check: FAILED"
-              exit 1
+
+              echo "Rollback frontend health check: FAILED"
+
+              rollback_frontend_healthy=false
+
+              break
+
             fi
 
-            echo "Backend not ready. Retrying in 5 seconds..."
+            echo "Rollback frontend not ready. Retrying in 5 seconds..."
 
             sleep 5
+
             attempt=$((attempt + 1))
 
           done
 
-          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$IMAGE_TAG|SUCCESS" \
+
+          # ========================================================
+          # ROLLBACK BACKEND HEALTH CHECK
+          # ========================================================
+
+          if [ "$rollback_frontend_healthy" = true ]; then
+
+            echo "Checking rollback backend..."
+
+            attempt=1
+
+            rollback_backend_healthy=false
+
+            while [ "$attempt" -le "$max_attempts" ]; do
+
+              if curl -fsS http://localhost/api/health > /dev/null; then
+
+                echo "Rollback backend health check: PASS"
+
+                rollback_backend_healthy=true
+
+                break
+
+              fi
+
+              if [ "$attempt" -eq "$max_attempts" ]; then
+
+                echo "Rollback backend health check: FAILED"
+
+                rollback_backend_healthy=false
+
+                break
+
+              fi
+
+              echo "Rollback backend not ready. Retrying in 5 seconds..."
+
+              sleep 5
+
+              attempt=$((attempt + 1))
+
+            done
+
+          else
+
+            rollback_backend_healthy=false
+
+          fi
+
+
+          # ========================================================
+          # ROLLBACK SUCCESS
+          # ========================================================
+
+          if [ "$rollback_frontend_healthy" = true ] \
+             && [ "$rollback_backend_healthy" = true ]; then
+
+            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$ROLLBACK_SHA|ROLLBACK_SUCCESS" \
+              >> "$HISTORY_FILE"
+
+            echo "======================================"
+            echo "ROLLBACK SUCCESSFUL"
+            echo "Restored SHA: $ROLLBACK_SHA"
+            echo "======================================"
+
+            # IMPORTANT:
+            # The original deployment failed, so the GitHub Actions
+            # deployment must remain FAILED even though rollback worked.
+
+            exit 1
+
+          fi
+
+
+          # ========================================================
+          # ROLLBACK FAILURE
+          # ========================================================
+
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)|$ROLLBACK_SHA|ROLLBACK_FAILED" \
             >> "$HISTORY_FILE"
 
           echo "======================================"
-          echo "All health checks passed"
-          echo "Deployment successful"
-          echo "SHA: $IMAGE_TAG"
+          echo "CRITICAL: ROLLBACK FAILED"
+          echo "Rollback SHA: $ROLLBACK_SHA"
+          echo "Production may be unhealthy"
           echo "======================================"
+
+          exit 1
 
           EOF
