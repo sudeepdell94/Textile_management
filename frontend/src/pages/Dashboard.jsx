@@ -107,7 +107,7 @@ export default function Dashboard() {
         <div className="col-md-4">
           <div className="card shadow-sm h-100 border-success">
             <div className="card-body text-center">
-              <h6 className="text-muted">Sarees</h6>
+              <h6 className="text-muted">Sarees Rohith</h6>
               <p className="display-6 text-success">{totalToday}</p>
             </div>
           </div>
